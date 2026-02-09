@@ -1,71 +1,139 @@
 import time
+import csv
+import os
 from bs4 import BeautifulSoup
-import undetected_chromedriver as uc
+
+from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
-# ---------------- Helper Functions ----------------
-def clean_text(text):
-    if text:
-        return text.replace("\n", " ").strip()
-    return None
 
-def parse_price(price_text):
-    if price_text:
-        return price_text.replace("\n", "").strip()
-    return None
+# ---------------- Helpers ----------------
 
-# ---------------- Scraper Class ----------------
+def clean(text):
+    return text.replace("\n", " ").strip() if text else ""
+
+
+# ---------------- Scraper ----------------
+
 class Scraper:
-    def __init__(self, base_url, pages=5):
-        self.base_url = base_url
-        self.pages = pages
-        self.hotels_data = []
 
-        # ---------------- Chrome Options ----------------
-        options = uc.ChromeOptions()
+    BASE_URL = "https://www.booking.com/searchresults.html"
+
+    def __init__(self, city, checkin, checkout):
+
+        self.city = city
+        self.checkin = checkin
+        self.checkout = checkout
+        self.results = []
+
+        options = webdriver.ChromeOptions()
         options.add_argument("--start-maximized")
-        options.add_argument("--disable-blink-features=AutomationControlled")  # reduce bot detection
+        options.add_argument("--disable-blink-features=AutomationControlled")
 
-        # ---------------- Fix for Chrome v144 ----------------
-        # Automatically downloads ChromeDriver matching your browser version
-        self.driver = uc.Chrome(version_main=144, options=options)
+        self.driver = webdriver.Chrome(
+            service=Service(ChromeDriverManager().install()),
+            options=options
+        )
 
-        self.wait = WebDriverWait(self.driver, 20)
+        self.wait = WebDriverWait(self.driver, 25)
 
-    def scrape_page(self, page_number):
-        print(f"Scraping page {page_number + 1}...")
-        self.driver.get(self.base_url + f"&offset={page_number * 25}")
+    # ---------------- Build URL ----------------
 
-        self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='property-card']")))
+    def build_url(self):
+
+        return (
+            f"{self.BASE_URL}"
+            f"?ss={self.city}"
+            f"&checkin={self.checkin}"
+            f"&checkout={self.checkout}"
+        )
+
+    # ---------------- Auto Scroll + Load ----------------
+
+    def auto_scroll(self):
+
+        last_height = 0
+
+        while True:
+
+            self.driver.execute_script(
+                "window.scrollTo(0, document.body.scrollHeight);"
+            )
+            time.sleep(3)
+
+            # click Load more if exists
+            try:
+                btn = self.driver.find_element(
+                    By.XPATH,
+                    "//button/span[contains(text(),'Load')]"
+                )
+                self.driver.execute_script("arguments[0].click();", btn)
+                print("Clicked Load More")
+                time.sleep(4)
+            except:
+                pass
+
+            new_height = self.driver.execute_script(
+                "return document.body.scrollHeight"
+            )
+
+            if new_height == last_height:
+                print("\nReached END of results.\n")
+                break
+
+            last_height = new_height
+
+    # ---------------- Parse Hotels ----------------
+
+    def parse_hotels(self):
+
         soup = BeautifulSoup(self.driver.page_source, "html.parser")
-        hotels = soup.select("div[data-testid='property-card']")
+        cards = soup.select("div[data-testid='property-card']")
 
-        for hotel in hotels:
-            name = clean_text(hotel.select_one("div[data-testid='title']").get_text(strip=True) if hotel.select_one("div[data-testid='title']") else None)
-            location = clean_text(hotel.select_one("span[data-testid='address']").get_text(strip=True) if hotel.select_one("span[data-testid='address']") else None)
-            price = parse_price(hotel.select_one("span[data-testid='price-and-discounted-price']").get_text(strip=True) if hotel.select_one("span[data-testid='price-and-discounted-price']") else None)
-            rating = clean_text(hotel.select_one("div[data-testid='review-score'] div").get_text(strip=True) if hotel.select_one("div[data-testid='review-score'] div") else None)
-            reviews = clean_text(hotel.select_one("div[data-testid='review-score'] div:nth-child(2)").get_text(strip=True) if hotel.select_one("div[data-testid='review-score'] div:nth-child(2)") else None)
-            room_type = clean_text(hotel.select_one("div[data-testid='room-name']").get_text(strip=True) if hotel.select_one("div[data-testid='room-name']") else None)
+        print(f"Total hotels detected: {len(cards)}")
 
-            self.hotels_data.append([name, location, price, rating, reviews, room_type])
+        for h in cards:
 
-        time.sleep(5)
+            self.results.append([
+                clean(h.select_one("div[data-testid='title']").text if h.select_one("div[data-testid='title']") else ""),
+                clean(h.select_one("span[data-testid='address']").text if h.select_one("span[data-testid='address']") else ""),
+                clean(h.select_one("span[data-testid='price-and-discounted-price']").text if h.select_one("span[data-testid='price-and-discounted-price']") else ""),
+                clean(h.select_one("div[data-testid='review-score'] div").text if h.select_one("div[data-testid='review-score'] div") else "")
+            ])
 
-    def scrape_all(self):
-        for page in range(self.pages):
-            self.scrape_page(page)
+    # ---------------- RUN ----------------
+
+    def run(self):
+
+        print(f"\nOpening {self.city}...\n")
+
+        self.driver.get(self.build_url())
+
+        self.wait.until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "div[data-testid='property-card']")
+            )
+        )
+
+        self.auto_scroll()
+        self.parse_hotels()
         self.driver.quit()
-        return self.hotels_data
 
-    def save_to_csv(self, output_file):
-        import csv
-        import os
+    # ---------------- SAVE ----------------
+
+    def save_to_csv(self):
+
         os.makedirs("output", exist_ok=True)
-        with open(output_file, "w", newline="", encoding="utf-8") as f:
+        path = f"output/{self.city}.csv"
+
+        with open(path, "w", newline="", encoding="utf-8") as f:
+
             writer = csv.writer(f)
-            writer.writerow(["Hotel Name","Location","Price per Night","Star Rating","Number of Reviews","Room Type"])
-            writer.writerows(self.hotels_data)
-        print(f"Saved {len(self.hotels_data)} records to {output_file}")
+            writer.writerow(["Hotel", "Location", "Price", "Rating"])
+            writer.writerows(self.results)
+
+        print(f"Saved {len(self.results)} hotels → {path}")

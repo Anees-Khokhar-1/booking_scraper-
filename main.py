@@ -1,38 +1,26 @@
 from scraper.scraper import Scraper
-import os
+
 
 def main():
-    print("=== Booking.com Hotel Scraper ===")
 
-    # ---------------- Get user input ----------------
-    city = input("Enter city name (e.g., Paris): ").strip()
-    checkin = input("Enter check-in date (YYYY-MM-DD): ").strip()
-    checkout = input("Enter check-out date (YYYY-MM-DD): ").strip()
-    pages = input("Enter number of pages to scrape (default 5): ").strip()
+    print("=== Booking.com Auto Pagination Scraper ===\n")
 
-    if not pages.isdigit():
-        pages = 5
-    else:
-        pages = int(pages)
+    # -------- User Input --------
+    city = input("Enter city: ").strip()
+    checkin = input("Enter check-in (YYYY-MM-DD): ").strip()
+    checkout = input("Enter checkout (YYYY-MM-DD): ").strip()
 
-    # ---------------- Construct URL ----------------
-    base_url = f"https://www.booking.com/searchresults.html?ss={city}&checkin={checkin}&checkout={checkout}"
+    # -------- Initialize Scraper --------
+    scraper = Scraper(city, checkin, checkout)
 
-    # ---------------- Output File ----------------
-    output_dir = "output"
-    os.makedirs(output_dir, exist_ok=True)
-    output_file = os.path.join(output_dir, f"booking_hotels_{city}_{checkin}.csv")
+    # -------- Run Scraper --------
+    scraper.run()
 
-    # ---------------- Initialize Scraper ----------------
-    scraper = Scraper(base_url=base_url, pages=pages)
+    # -------- Save CSV --------
+    scraper.save_to_csv()
 
-    # ---------------- Start Scraping ----------------
-    print(f"\nScraping Booking.com for {city} ({checkin} to {checkout})...")
-    scraper.scrape_all()
+    print("\nDONE — All data saved successfully.\n")
 
-    # ---------------- Save Data ----------------
-    scraper.save_to_csv(output_file)
-    print(f"Scraping completed! Data saved to {output_file}")
 
 if __name__ == "__main__":
     main()
