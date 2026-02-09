@@ -5,9 +5,19 @@ from bs4 import BeautifulSoup
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
+
+# ---------------- Helpers ----------------
+
+def clean(text):
+    return text.replace("\n", " ").strip() if text else ""
+
+
+# ---------------- Scraper ----------------
 
 class Scraper:
 
@@ -18,7 +28,7 @@ class Scraper:
         self.city = city
         self.checkin = checkin
         self.checkout = checkout
-        self.hotels = []
+        self.results = []
 
         options = webdriver.ChromeOptions()
         options.add_argument("--start-maximized")
@@ -29,7 +39,9 @@ class Scraper:
             options=options
         )
 
-    # ---------------- URL ----------------
+        self.wait = WebDriverWait(self.driver, 25)
+
+    # ---------------- Build URL ----------------
 
     def build_url(self):
 
@@ -40,32 +52,34 @@ class Scraper:
             f"&checkout={self.checkout}"
         )
 
-    # ---------------- AUTO LOAD EVERYTHING ----------------
+    # ---------------- Auto Scroll + Load ----------------
 
-    def auto_load_all(self):
-
-        self.driver.get(self.build_url())
-        time.sleep(5)
+    def auto_scroll(self):
 
         last_height = 0
 
         while True:
 
-            # Scroll bottom
-            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            self.driver.execute_script(
+                "window.scrollTo(0, document.body.scrollHeight);"
+            )
             time.sleep(3)
 
-            # Click Load More if exists
+            # click Load more if exists
             try:
-                btn = self.driver.find_element(By.XPATH, "//button/span[contains(text(),'Load more')]")
+                btn = self.driver.find_element(
+                    By.XPATH,
+                    "//button/span[contains(text(),'Load')]"
+                )
                 self.driver.execute_script("arguments[0].click();", btn)
                 print("Clicked Load More")
                 time.sleep(4)
             except:
                 pass
 
-            # Check scroll height
-            new_height = self.driver.execute_script("return document.body.scrollHeight")
+            new_height = self.driver.execute_script(
+                "return document.body.scrollHeight"
+            )
 
             if new_height == last_height:
                 print("\nReached END of results.\n")
@@ -73,9 +87,9 @@ class Scraper:
 
             last_height = new_height
 
-    # ---------------- SCRAPE ----------------
+    # ---------------- Parse Hotels ----------------
 
-    def scrape(self):
+    def parse_hotels(self):
 
         soup = BeautifulSoup(self.driver.page_source, "html.parser")
         cards = soup.select("div[data-testid='property-card']")
@@ -84,24 +98,29 @@ class Scraper:
 
         for h in cards:
 
-            name = h.select_one("div[data-testid='title']")
-            location = h.select_one("span[data-testid='address']")
-            price = h.select_one("span[data-testid='price-and-discounted-price']")
-            rating = h.select_one("div[data-testid='review-score'] div")
-
-            self.hotels.append([
-                name.text.strip() if name else "",
-                location.text.strip() if location else "",
-                price.text.strip() if price else "",
-                rating.text.strip() if rating else ""
+            self.results.append([
+                clean(h.select_one("div[data-testid='title']").text if h.select_one("div[data-testid='title']") else ""),
+                clean(h.select_one("span[data-testid='address']").text if h.select_one("span[data-testid='address']") else ""),
+                clean(h.select_one("span[data-testid='price-and-discounted-price']").text if h.select_one("span[data-testid='price-and-discounted-price']") else ""),
+                clean(h.select_one("div[data-testid='review-score'] div").text if h.select_one("div[data-testid='review-score'] div") else "")
             ])
 
     # ---------------- RUN ----------------
 
     def run(self):
 
-        self.auto_load_all()
-        self.scrape()
+        print(f"\nOpening {self.city}...\n")
+
+        self.driver.get(self.build_url())
+
+        self.wait.until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "div[data-testid='property-card']")
+            )
+        )
+
+        self.auto_scroll()
+        self.parse_hotels()
         self.driver.quit()
 
     # ---------------- SAVE ----------------
@@ -109,13 +128,12 @@ class Scraper:
     def save_to_csv(self):
 
         os.makedirs("output", exist_ok=True)
-
         path = f"output/{self.city}.csv"
 
         with open(path, "w", newline="", encoding="utf-8") as f:
 
             writer = csv.writer(f)
             writer.writerow(["Hotel", "Location", "Price", "Rating"])
-            writer.writerows(self.hotels)
+            writer.writerows(self.results)
 
-        print(f"\nSaved {len(self.hotels)} hotels → {path}") 
+        print(f"Saved {len(self.results)} hotels → {path}")

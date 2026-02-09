@@ -3,17 +3,23 @@ from scraper.scraper import Scraper
 
 def main():
 
-    print("\n=== Booking.com Auto Scroll Scraper ===\n")
+    print("=== Booking.com Auto Pagination Scraper ===\n")
 
-    city = input("Enter city: ")
-    checkin = input("Enter check-in: ")
-    checkout = input("Enter checkout: ")
+    # -------- User Input --------
+    city = input("Enter city: ").strip()
+    checkin = input("Enter check-in (YYYY-MM-DD): ").strip()
+    checkout = input("Enter checkout (YYYY-MM-DD): ").strip()
 
+    # -------- Initialize Scraper --------
     scraper = Scraper(city, checkin, checkout)
+
+    # -------- Run Scraper --------
     scraper.run()
+
+    # -------- Save CSV --------
     scraper.save_to_csv()
 
-    print("\nDONE All Data is Save.\n")
+    print("\nDONE — All data saved successfully.\n")
 
 
 if __name__ == "__main__":
