@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hotel Data</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<h2>Booking Scraper Data</h2>
+
+<table>
+<tr>
+    <th>No</th>
+    <th>Hotel</th>
+    <th>Location</th>
+    <th>Price</th>
+    <th>Rating</th>
+</tr>
+
+{% for row in data %}
+<tr>
+    <td>{{ row["No"] }}</td>
+    <td>{{ row["Hotel"] }}</td>
+    <td>{{ row["Location"] }}</td>
+    <td>{{ row["Price"] }}</td>
+    <td>{{ row["Rating"] }}</td>
+</tr>
+{% endfor %}
+
+</table>
+
+</body>
+</html>

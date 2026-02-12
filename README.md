@@ -1,13 +1,16 @@
-# Booking.com Hotel Scraper 🏨
+# Booking.com Hotel Scraper (Python + Selenium)
 
-A Python-based web scraper that extracts hotel information from Booking.com using Selenium and BeautifulSoup.
+A Python-based hotel scraper for Booking.com using Selenium and BeautifulSoup.
 
-## 🚀 Features
-- Scrapes hotel name, location, price, rating, reviews, and room type
-- Supports multiple pages
-- Uses undetected-chromedriver to reduce bot detection
-- Saves data to CSV
+This project:
 
+✅ Automatically finds top cities for a given country  
+✅ Scrapes hotel name, location, price, and rating  
+✅ Saves results into CSV files  
+✅ Creates one CSV per city  
+✅ Handles scrolling and dynamic loading  
+
+---
 ## 🛠 Tech Stack
 - Python
 - Selenium
